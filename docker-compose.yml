@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # NGINX Load Balancer
+  nginx:
+    build: ./nginx
+    container_name: food-ordering-nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - user-service
+      - restaurant-service
+      - order-service
+      - payment-service
+      - frontend
+    networks:
+      - food-ordering-network
+    restart: unless-stopped
+
+  # User Service
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    environment:
+      PORT: 3001
+      MONGODB_URI: mongodb+srv://arunramamoorthi05_db_user:Wbi9cx8mQtaTdWse@cluster0.t8x2gng.mongodb.net/user-db?retryWrites=true&w=majority&appName=Cluster0
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key_change_in_production}
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    networks:
+      - food-ordering-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Restaurant Service
+  restaurant-service:
+    build: ./restaurant-service
+    container_name: restaurant-service
+    environment:
+      PORT: 3002
+      MONGODB_URI: mongodb+srv://arunramamoorthi05_db_user:Wbi9cx8mQtaTdWse@cluster0.t8x2gng.mongodb.net/restaurant-db?retryWrites=true&w=majority&appName=Cluster0
+      NODE_ENV: production
+    ports:
+      - "3002:3002"
+    networks:
+      - food-ordering-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Order Service
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    environment:
+      PORT: 3003
+      MONGODB_URI: mongodb+srv://arunramamoorthi05_db_user:Wbi9cx8mQtaTdWse@cluster0.t8x2gng.mongodb.net/order-db?retryWrites=true&w=majority&appName=Cluster0
+      USER_SERVICE_URL: http://user-service:3001
+      PAYMENT_SERVICE_URL: http://payment-service:3004
+      NODE_ENV: production
+    ports:
+      - "3003:3003"
+    networks:
+      - food-ordering-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - user-service
+
+  # Payment Service
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
+    environment:
+      PORT: 3004
+      MONGODB_URI: mongodb+srv://arunramamoorthi05_db_user:Wbi9cx8mQtaTdWse@cluster0.t8x2gng.mongodb.net/payment-db?retryWrites=true&w=majority&appName=Cluster0
+      ORDER_SERVICE_URL: http://order-service:3003
+      NODE_ENV: production
+    ports:
+      - "3004:3004"
+    networks:
+      - food-ordering-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - order-service
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    container_name: food-ordering-frontend
+    ports:
+      - "5173:5173"
+    networks:
+      - food-ordering-network
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+
+networks:
+  food-ordering-network:
+    driver: bridge
